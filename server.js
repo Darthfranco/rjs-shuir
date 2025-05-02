@@ -14,63 +14,48 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static('.'));
 
 // MongoDB setup
-const uri = process.env.MONGODB_URI || '';
+const uri = process.env.MONGODB_URI || 'mongodb+srv://rjsadmin:VYdJT03rN8a6VMVd@rjsshuir.2fk6fuf.mongodb.net/rjs-shuir?retryWrites=true&w=majority';
 const client = new MongoClient(uri, { connectTimeoutMS: 10000, serverSelectionTimeoutMS: 10000 });
 let db;
 
 async function connectDB() {
-  if (db) return db;
   try {
-    if (!uri) {
-      throw new Error('MONGODB_URI is not defined');
-    }
     await client.connect();
     db = client.db('rjs-shuir');
     console.log('Connected to MongoDB');
-    return db;
   } catch (error) {
     console.error('MongoDB connection error:', error.message, error.stack);
     throw error;
   }
 }
-
-// Middleware to ensure DB connection
-app.use(async (req, res, next) => {
-  try {
-    await connectDB();
-    if (!db) {
-      throw new Error('Database not initialized');
-    }
-    next();
-  } catch (error) {
-    console.error('Database middleware error:', error.message, error.stack);
-    res.status(500).json({ message: 'Database connection failed.', error: error.message });
-  }
-});
+connectDB();
 
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
 });
 
-app.post('/api/send-support', async (req, res) => {
-  const { name, email, problem } = req.body;
-
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-
-  const mailOptions = {
-    from: email,
-    to: process.env.EMAIL_USER,
-    subject: `Tech Support Request from ${name}`,
-    text: `Name: ${name}\nEmail: ${email}\nProblem: ${problem}`,
-  };
-
+app.post('/send-support', async (req, res) => {
   try {
+    const { name, email, problem } = req.body;
+    if (!name || !email || !problem) {
+      return res.status(400).json({ message: 'Missing required fields.' });
+    }
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: email,
+      to: process.env.EMAIL_USER,
+      subject: `Tech Support Request from ${name}`,
+      text: `Name: ${name}\nEmail: ${email}\nProblem: ${problem}`,
+    };
+
     await transporter.sendMail(mailOptions);
     res.json({ message: 'Support request sent successfully!' });
   } catch (error) {
@@ -79,7 +64,7 @@ app.post('/api/send-support', async (req, res) => {
   }
 });
 
-app.post('/api/upload', upload.single('file'), async (req, res) => {
+app.post('/upload', upload.single('file'), async (req, res) => {
   try {
     const { date, type, 'shiur-number': shiurNumber, 'mussar-name': mussarName } = req.body;
     if (!req.file || !date || !type) {
@@ -93,7 +78,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       return res.status(500).json({ message: 'Server configuration error: Missing Blob token.' });
     }
 
-    // Upload to Vercel Blob
+    // Upload file to Vercel Blob
     console.log('Uploading to Vercel Blob:', req.file.originalname);
     const blob = await put(`recordings/${Date.now()}_${req.file.originalname}`, req.file.buffer, {
       access: 'public',
@@ -102,6 +87,10 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     console.log('Blob upload successful:', blob.url);
 
     // Store metadata in MongoDB
+    if (!db) {
+      console.error('MongoDB not connected');
+      return res.status(500).json({ message: 'Database not connected.' });
+    }
     const collection = db.collection('recordings');
     const recording = {
       date,
@@ -122,9 +111,13 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-app.get('/api/search', async (req, res) => {
+app.get('/search', async (req, res) => {
   try {
     const query = req.query.query || '';
+    if (!db) {
+      console.error('MongoDB not connected');
+      return res.status(500).json({ message: 'Database not connected.' });
+    }
     const collection = db.collection('recordings');
     const recordings = await collection
       .find({
