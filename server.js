@@ -14,26 +14,38 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static('.'));
 
 // MongoDB setup
-const uri = 'mongodb+srv://rjsadmin:VYdJT03rN8a6VMVd@rjsshuir.2fk6fuf.mongodb.net/rjs-shuir?retryWrites=true&w=majority'; // Replace with your MongoDB Atlas connection string
+const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri);
 let db;
 
 async function connectDB() {
+  if (db) return db;
   try {
     await client.connect();
     db = client.db('rjs-shuir');
     console.log('Connected to MongoDB');
+    return db;
   } catch (error) {
-    console.error('MongoDB connection error:', error);
+    console.error('MongoDB connection error:', error.message, error.stack);
+    throw error;
   }
 }
-connectDB();
+
+// Middleware to ensure DB connection
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    res.status(500).json({ message: 'Database connection failed.' });
+  }
+});
 
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
 });
 
-app.post('/send-support', async (req, res) => {
+app.post('/api/send-support', async (req, res) => {
   const { name, email, problem } = req.body;
 
   const transporter = nodemailer.createTransport({
@@ -55,23 +67,32 @@ app.post('/send-support', async (req, res) => {
     await transporter.sendMail(mailOptions);
     res.json({ message: 'Support request sent successfully!' });
   } catch (error) {
-    console.error(error);
+    console.error('Error sending support email:', error.message, error.stack);
     res.status(500).json({ message: 'Error sending support request.' });
   }
 });
 
-app.post('/upload', upload.single('file'), async (req, res) => {
+app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     const { date, type, 'shiur-number': shiurNumber, 'mussar-name': mussarName } = req.body;
     if (!req.file || !date || !type) {
+      console.error('Missing required fields:', { file: !!req.file, date, type });
       return res.status(400).json({ message: 'Missing required fields.' });
     }
 
-    // Upload file to Vercel Blob
+    // Verify Blob token
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      console.error('BLOB_READ_WRITE_TOKEN is missing');
+      return res.status(500).json({ message: 'Server configuration error.' });
+    }
+
+    // Upload to Vercel Blob
+    console.log('Uploading to Vercel Blob:', req.file.originalname);
     const blob = await put(`recordings/${Date.now()}_${req.file.originalname}`, req.file.buffer, {
       access: 'public',
-      token: process.env.BLOB_READ_WRITE_TOKEN, // Set during Vercel deployment
+      token: process.env.BLOB_READ_WRITE_TOKEN,
     });
+    console.log('Blob upload successful:', blob.url);
 
     // Store metadata in MongoDB
     const collection = db.collection('recordings');
@@ -83,16 +104,18 @@ app.post('/upload', upload.single('file'), async (req, res) => {
       fileUrl: blob.url,
       uploadedAt: new Date(),
     };
+    console.log('Inserting to MongoDB:', recording);
     await collection.insertOne(recording);
+    console.log('MongoDB insert successful');
 
     res.json({ message: 'Recording uploaded successfully!' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error uploading recording.' });
+    console.error('Error uploading recording:', error.message, error.stack);
+    res.status(500).json({ message: 'Error uploading recording.', error: error.message });
   }
 });
 
-app.get('/search', async (req, res) => {
+app.get('/api/search', async (req, res) => {
   try {
     const query = req.query.query || '';
     const collection = db.collection('recordings');
@@ -108,13 +131,10 @@ app.get('/search', async (req, res) => {
       .toArray();
     res.json(recordings);
   } catch (error) {
-    console.error(error);
+    console.error('Error searching recordings:', error.message, error.stack);
     res.status(500).json({ message: 'Error searching recordings.' });
   }
 });
 
-app.listen(3000, () => {
-  console.log('Server running on http://localhost:3000');
-});
-
+// Export for Vercel serverless
 module.exports = app;
