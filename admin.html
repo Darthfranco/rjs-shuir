@@ -56,7 +56,7 @@
         <button onclick="checkPassword()" class="btn-gold w-full py-2 rounded">Unlock</button>
       </div>
       <form id="upload-form" class="hidden">
-        <label for="file" class="block text-gray-300 mb-2">Select Recording (MP3, max 2 hours)</label>
+        <label for="file" class="block text-gray-300 mb-2">Select Recording (MP3, max 2 hours, 200MB)</label>
         <input type="file" id="file" name="file" accept=".mp3" class="w-full p-2 rounded bg-gray-800 text-white border border-gray-600 mb-4" required />
         <label for="date" class="block text-gray-300 mb-2">Date</label>
         <input type="date" id="date" name="date" class="w-full p-2 rounded bg-gray-800 text-white border border-gray-600 mb-4" required />
@@ -99,9 +99,18 @@
       e.preventDefault();
       const message = document.getElementById('upload-message');
       const formData = new FormData(e.target);
+      const file = formData.get('file');
       const type = document.getElementById('type').value;
 
-      if (!formData.get('file') || !formData.get('date') || !type) {
+      // Client-side file size validation
+      const maxSize = 200 * 1024 * 1024; // 200MB in bytes
+      if (file.size > maxSize) {
+        message.textContent = 'File too large. Maximum size is 200MB.';
+        message.classList.add('text-red-400');
+        return;
+      }
+
+      if (!file || !formData.get('date') || !type) {
         message.textContent = 'Missing required fields.';
         message.classList.add('text-red-400');
         return;
@@ -113,6 +122,14 @@
           method: 'POST',
           body: formData,
         });
+
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await response.text();
+          throw new Error(`Server returned non-JSON response: ${text}`);
+        }
+
         const result = await response.json();
         if (!response.ok) {
           throw new Error(result.message || 'Failed to upload recording.');

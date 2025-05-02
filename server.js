@@ -16,11 +16,15 @@ app.use(cors({
   allowedHeaders: ['Content-Type'],
 }));
 
-// Configure Multer for file uploads
-const upload = multer({ storage: multer.memoryStorage() });
+// Configure Multer for file uploads with increased file size limit
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 200 * 1024 * 1024 }, // 200MB limit
+});
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Increase Express body parser limit
+app.use(express.json({ limit: '200mb' }));
+app.use(express.urlencoded({ extended: true, limit: '200mb' }));
 app.use(express.static('.'));
 
 // MongoDB setup
@@ -67,7 +71,7 @@ app.post('/send-support', async (req, res) => {
   }
 });
 
-// New endpoint to handle file upload and metadata storage
+// Handle file upload and metadata storage
 app.post('/upload-recording', upload.single('file'), async (req, res) => {
   try {
     const { date, type, 'shiur-number': shiurNumber, 'mussar-name': mussarName } = req.body;
@@ -99,8 +103,19 @@ app.post('/upload-recording', upload.single('file'), async (req, res) => {
     res.json({ message: 'Recording uploaded and metadata stored successfully!' });
   } catch (error) {
     console.error('Error uploading recording:', error);
-    res.status(500).json({ message: 'Error uploading recording: ' + error.message });
+    res.status(500).json({ message: `Error uploading recording: ${error.message}` });
   }
+});
+
+// Error handling middleware for Multer errors
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ message: 'File too large. Maximum size is 200MB.' });
+    }
+    return res.status(400).json({ message: `Multer error: ${err.message}` });
+  }
+  next(err);
 });
 
 app.get('/search', async (req, res) => {
