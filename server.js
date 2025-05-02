@@ -2,7 +2,7 @@ const express = require('express');
 const nodemailer = require('nodemailer');
 const dotenv = require('dotenv');
 const { MongoClient } = require('mongodb');
-const { put, del, head, generateClientUpload } = require('@vercel/blob');
+const { put, del, head, list } = require('@vercel/blob');
 
 dotenv.config();
 const app = express();
@@ -70,7 +70,7 @@ app.post('/send-support', async (req, res) => {
   }
 });
 
-// Improved generate-upload-url endpoint with better error handling
+// Fixed generate-upload-url endpoint that creates a signed URL for client-side uploads
 app.post('/generate-upload-url', async (req, res) => {
   console.log('Received generate-upload-url request');
   console.log('Request body:', req.body);
@@ -86,25 +86,24 @@ app.post('/generate-upload-url', async (req, res) => {
     const cleanFilename = filename.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
     const timestampedFilename = `recordings/${Date.now()}_${cleanFilename}`;
     
-    console.log('Generating client upload URL for:', timestampedFilename);
+    console.log('Generating signed URL for:', timestampedFilename);
     
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
       console.error('BLOB_READ_WRITE_TOKEN is missing');
       return res.status(500).json({ message: 'Server configuration error: Missing Blob token' });
     }
     
-    const { url, downloadUrl } = await generateClientUpload({
-      pathname: timestampedFilename,
-      options: {
-        access: 'public',
-        token: process.env.BLOB_READ_WRITE_TOKEN
-      }
-    });
+    // Create a signed URL directly using the put function
+    const signedURL = await put(timestampedFilename, {
+      access: 'public',
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      addRandomSuffix: false,
+    }, { type: 'application/octet-stream' });
     
-    console.log('Generated URL successfully:', { uploadUrl: url, downloadUrl });
+    console.log('Generated URL successfully:', { uploadUrl: signedURL.url });
     res.json({ 
-      uploadUrl: url,
-      downloadUrl: downloadUrl
+      uploadUrl: signedURL.url,
+      downloadUrl: signedURL.url
     });
   } catch (error) {
     console.error('Error generating upload URL:', error);

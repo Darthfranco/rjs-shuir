@@ -174,11 +174,11 @@
         message.textContent = `Preparing file: ${file.name} (${Math.round(file.size/1024)} KB)`;
         progressBar.style.width = '5%';
 
-        // Step 1: Get upload URL from server - make sure to use POST method
+        // Step 1: Get upload URL from server
         message.textContent = 'Requesting upload URL...';
         progressBar.style.width = '10%';
         
-        const response = await fetch('/generate-upload-url', {
+        const urlResponse = await fetch('/generate-upload-url', {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -187,12 +187,12 @@
           body: JSON.stringify({ filename: file.name }),
         });
         
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Server error: ${response.status} - ${response.statusText} - ${errorText}`);
+        if (!urlResponse.ok) {
+          const errorText = await urlResponse.text();
+          throw new Error(`Server error: ${urlResponse.status} - ${urlResponse.statusText} - ${errorText}`);
         }
         
-        const data = await response.json();
+        const data = await urlResponse.json();
         console.log('Upload URL response:', data);
         const uploadUrl = data.uploadUrl;
         
@@ -200,14 +200,14 @@
           throw new Error('Failed to get upload URL.');
         }
 
-        // Step 2: Upload file to Vercel Blob
-        message.textContent = 'Uploading file to Vercel Blob...';
+        // Step 2: Upload file directly to the URL provided by Vercel Blob
+        message.textContent = 'Uploading file...';
         progressBar.style.width = '30%';
         
-        // Create XMLHttpRequest for progress monitoring
+        // Use fetch with PUT method to directly upload to Vercel Blob
         const xhr = new XMLHttpRequest();
         xhr.open('PUT', uploadUrl, true);
-        xhr.setRequestHeader('Content-Type', file.type || 'audio/mpeg');
+        xhr.setRequestHeader('Content-Type', 'audio/mpeg');
         
         xhr.upload.onprogress = function(event) {
           if (event.lengthComputable) {
@@ -220,9 +220,7 @@
         const uploadPromise = new Promise((resolve, reject) => {
           xhr.onload = function() {
             if (xhr.status >= 200 && xhr.status < 300) {
-              // Try to get the Vercel Blob URL from response headers
-              const fileUrl = xhr.getResponseHeader('x-vercel-blob-url') || data.downloadUrl || uploadUrl.split('?')[0];
-              resolve(fileUrl);
+              resolve(uploadUrl.split('?')[0]); // Get the file URL without query parameters
             } else {
               reject(new Error(`Upload error: ${xhr.status} - ${xhr.statusText}`));
             }
@@ -234,6 +232,7 @@
         
         xhr.send(file);
         const fileUrl = await uploadPromise;
+        
         console.log('File uploaded to:', fileUrl);
 
         // Step 3: Store metadata in MongoDB
