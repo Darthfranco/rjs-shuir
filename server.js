@@ -2,7 +2,7 @@ const express = require('express');
 const nodemailer = require('nodemailer');
 const dotenv = require('dotenv');
 const { MongoClient } = require('mongodb');
-const { handleUpload } = require('@vercel/blob');
+const { put, del, head, generateClientUpload } = require('@vercel/blob');
 
 dotenv.config();
 const app = express();
@@ -11,23 +11,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('.'));
 
-// Enhanced CORS middleware for better debugging
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  
-  // Log incoming requests for debugging
-  console.log(`${req.method} ${req.path} - Headers:`, req.headers);
-  
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  next();
-});
-
 // MongoDB setup
-const uri = process.env.MONGODB_URI || 'mongodb+srv://rjsadmin:VYdJT03rN8a6VMVd@rjsshuir.2fk6fuf.mongodb.net/rjs-shuir?retryWrites=true&w=majority';
+const uri = 'mongodb+srv://rjsadmin:VYdJT03rN8a6VMVd@rjsshuir.2fk6fuf.mongodb.net/rjs-shuir?retryWrites=true&w=majority';
 const client = new MongoClient(uri);
 let db;
 
@@ -70,72 +55,32 @@ app.post('/send-support', async (req, res) => {
   }
 });
 
-// Fixed generate-upload-url endpoint using Vercel Blob's handleUpload
+// New endpoint to generate client-side upload URL
 app.post('/generate-upload-url', async (req, res) => {
-  console.log('Received generate-upload-url request');
-  console.log('Request body:', req.body);
-
+  const { filename } = req.body;
+  if (!filename) {
+    return res.status(400).json({ message: 'Filename is required.' });
+  }
   try {
-    const { filename } = req.body;
-    if (!filename) {
-      console.log('Missing filename in request');
-      return res.status(400).json({ message: 'Filename is required.' });
-    }
-
-    // Create a clean filename with timestamp to prevent conflicts
-    const cleanFilename = filename.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
-    const timestampedFilename = `recordings/${Date.now()}_${cleanFilename}`;
-
-    console.log('Generating client upload token for:', timestampedFilename);
-
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      console.error('BLOB_READ_WRITE_TOKEN is missing');
-      return res.status(500).json({ message: 'Server configuration error: Missing Blob token' });
-    }
-
-    // Use handleUpload to generate a token for client-side upload
-    const jsonResponse = await handleUpload({
-      body: {
-        pathname: timestampedFilename,
-        contentType: 'audio/mpeg',
-        access: 'public',
-      },
-      request: req,
-      onBeforeGenerateToken: async (pathname /*, clientPayload */) => {
-        // Optional: Add authentication or validation here
-        return {
-          allowedContentTypes: ['audio/mpeg'], // Restrict to MP3 files
-          tokenPayload: JSON.stringify({
-            // Add custom metadata if needed
-            timestamp: Date.now(),
-          }),
-        };
-      },
-      onUploadCompleted: async ({ blob, tokenPayload }) => {
-        console.log('Upload completed:', blob, tokenPayload);
-      },
+    const { url } = await generateClientUpload(`recordings/${Date.now()}_${filename}`, {
+      access: 'public',
+      token: process.env.BLOB_READ_WRITE_TOKEN,
     });
-
-    console.log('Generated upload token successfully:', jsonResponse);
-    res.json({
-      uploadUrl: jsonResponse.url, // URL for client to upload the file
-      downloadUrl: jsonResponse.downloadUrl, // URL to access the uploaded file
-    });
+    res.json({ uploadUrl: url });
   } catch (error) {
     console.error('Error generating upload URL:', error);
-    res.status(500).json({
-      message: 'Error generating upload URL: ' + error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-    });
+    res.status(500).json({ message: 'Error generating upload URL.' });
   }
+});
+
+// GET endpoint to handle invalid method for generate-upload-url
+app.get('/generate-upload-url', (req, res) => {
+  res.status(405).json({ message: 'Method Not Allowed. Use POST to generate upload URL.' });
 });
 
 // Modified upload endpoint to store metadata only
 app.post('/store-recording', async (req, res) => {
   try {
-    console.log('Received store-recording request');
-    console.log('Request body:', req.body);
-    
     const { date, type, 'shiur-number': shiurNumber, 'mussar-name': mussarName, fileUrl } = req.body;
     if (!fileUrl || !date || !type) {
       return res.status(400).json({ message: 'Missing required fields.' });
@@ -151,25 +96,18 @@ app.post('/store-recording', async (req, res) => {
       fileUrl,
       uploadedAt: new Date(),
     };
-    
-    const result = await collection.insertOne(recording);
-    console.log('Recording stored with ID:', result.insertedId);
+    await collection.insertOne(recording);
 
-    res.json({ 
-      message: 'Recording uploaded and metadata stored successfully!',
-      recordingId: result.insertedId
-    });
+    res.json({ message: 'Recording metadata stored successfully!' });
   } catch (error) {
-    console.error('Error storing recording metadata:', error);
-    res.status(500).json({ message: 'Error storing recording metadata: ' + error.message });
+    console.error(error);
+    res.status(500).json({ message: 'Error storing recording metadata.' });
   }
 });
 
 app.get('/search', async (req, res) => {
   try {
     const query = req.query.query || '';
-    console.log('Searching recordings with query:', query);
-    
     const collection = db.collection('recordings');
     const recordings = await collection
       .find({
@@ -180,32 +118,16 @@ app.get('/search', async (req, res) => {
           { mussarName: { $regex: query, $options: 'i' } },
         ],
       })
-      .sort({ uploadedAt: -1 }) // Show newest first
       .toArray();
-    
-    console.log(`Found ${recordings.length} matching recordings`);
     res.json(recordings);
   } catch (error) {
-    console.error('Error searching recordings:', error);
-    res.status(500).json({ message: 'Error searching recordings: ' + error.message });
+    console.error(error);
+    res.status(500).json({ message: 'Error searching recordings.' });
   }
 });
 
-// Enhanced health check endpoint for debugging
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV || 'development',
-    blobEnabled: !!process.env.BLOB_READ_WRITE_TOKEN,
-    nodeVersion: process.version,
-    blobVersion: require('@vercel/blob/package.json').version || 'unknown'
-  });
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+app.listen(3000, () => {
+  console.log('Server running on http://localhost:3000');
 });
 
 module.exports = app;
