@@ -34,6 +34,20 @@
       border-radius: 0.5rem;
       border: 1px solid #d4af37;
     }
+    .progress-bar {
+      width: 100%;
+      height: 20px;
+      background-color: #444;
+      border-radius: 4px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+    .progress {
+      height: 100%;
+      background-color: #d4af37;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
   </style>
 </head>
 <body>
@@ -73,7 +87,13 @@
           <label for="mussar-name" class="block text-gray-300 mb-2">Mussar Name</label>
           <input type="text" id="mussar-name" name="mussar-name" class="w-full p-2 rounded bg-gray-800 text-white border border-gray-600 mb-4" placeholder="e.g., Reb Cohen" />
         </div>
-        <button type="submit" class="btn-gold w-full py-2 rounded">Upload Recording</button>
+        <div id="progress-container" class="hidden mb-4">
+          <p class="text-gray-300 mb-2">Upload Progress:</p>
+          <div class="progress-bar">
+            <div id="progress" class="progress"></div>
+          </div>
+        </div>
+        <button type="submit" id="submit-btn" class="btn-gold w-full py-2 rounded">Upload Recording</button>
       </form>
       <p id="upload-message" class="mt-4 text-center"></p>
     </div>
@@ -97,7 +117,17 @@
 
     document.getElementById('upload-form').addEventListener('submit', async (e) => {
       e.preventDefault();
+      
       const message = document.getElementById('upload-message');
+      const progressContainer = document.getElementById('progress-container');
+      const progressBar = document.getElementById('progress');
+      const submitBtn = document.getElementById('submit-btn');
+      
+      message.textContent = 'Starting upload...';
+      message.className = 'mt-4 text-center text-white';
+      progressContainer.classList.remove('hidden');
+      submitBtn.disabled = true;
+      
       const fileInput = document.getElementById('file');
       const file = fileInput.files[0];
       const date = document.getElementById('date').value;
@@ -107,33 +137,72 @@
 
       if (!file || !date || !type) {
         message.textContent = 'Missing required fields.';
-        message.classList.add('text-red-400');
+        message.className = 'mt-4 text-center text-red-400';
+        submitBtn.disabled = false;
+        progressContainer.classList.add('hidden');
         return;
       }
 
       try {
         // Step 1: Get upload URL from server
+        message.textContent = 'Requesting upload URL...';
+        progressBar.style.width = '10%';
+        
         const response = await fetch('/generate-upload-url', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ filename: file.name }),
         });
-        const { uploadUrl } = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status} - ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        const uploadUrl = data.uploadUrl;
+        
         if (!uploadUrl) {
           throw new Error('Failed to get upload URL.');
         }
 
         // Step 2: Upload file to Vercel Blob
-        const uploadResponse = await fetch(uploadUrl, {
-          method: 'PUT',
-          body: file,
+        message.textContent = 'Uploading file to Vercel Blob...';
+        progressBar.style.width = '30%';
+        
+        // Create XMLHttpRequest for progress monitoring
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', uploadUrl, true);
+        xhr.setRequestHeader('Content-Type', file.type);
+        
+        xhr.upload.onprogress = function(event) {
+          if (event.lengthComputable) {
+            const percentComplete = Math.min(90, 30 + (event.loaded / event.total * 60));
+            progressBar.style.width = percentComplete + '%';
+            message.textContent = `Uploading: ${Math.round(percentComplete)}%`;
+          }
+        };
+        
+        const uploadPromise = new Promise((resolve, reject) => {
+          xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              const fileUrl = xhr.getResponseHeader('x-vercel-blob-url') || uploadUrl.split('?')[0];
+              resolve(fileUrl);
+            } else {
+              reject(new Error(`Upload error: ${xhr.status} - ${xhr.statusText}`));
+            }
+          };
+          xhr.onerror = function() {
+            reject(new Error('Network error during upload'));
+          };
         });
-        if (!uploadResponse.ok) {
-          throw new Error('Failed to upload file to Vercel Blob.');
-        }
-        const fileUrl = uploadResponse.headers.get('x-vercel-blob-url') || uploadUrl.split('?')[0];
+        
+        xhr.send(file);
+        const fileUrl = await uploadPromise;
 
         // Step 3: Store metadata in MongoDB
+        message.textContent = 'Storing recording metadata...';
+        progressBar.style.width = '95%';
+        
         const metadataResponse = await fetch('/store-recording', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -145,16 +214,31 @@
             fileUrl,
           }),
         });
+        
+        if (!metadataResponse.ok) {
+          throw new Error(`Metadata error: ${metadataResponse.status} - ${metadataResponse.statusText}`);
+        }
+        
         const result = await metadataResponse.json();
         message.textContent = result.message;
-        message.classList.add('text-green-400');
+        message.className = 'mt-4 text-center text-green-400';
+        progressBar.style.width = '100%';
         e.target.reset();
+        
+        // Hide progress bar after a delay
+        setTimeout(() => {
+          progressContainer.classList.add('hidden');
+          submitBtn.disabled = false;
+        }, 2000);
+        
       } catch (error) {
+        console.error('Upload error:', error);
         message.textContent = 'Error uploading recording: ' + error.message;
-        message.classList.add('text-red-400');
+        message.className = 'mt-4 text-center text-red-400';
+        progressContainer.classList.add('hidden');
+        submitBtn.disabled = false;
       }
     });
   </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93947ef729c70709',t:'MTc0NjE1NzIxMy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>

@@ -14,7 +14,7 @@
       {
         "src": "/generate-upload-url",
         "dest": "/server.js",
-        "methods": ["POST"]
+        "methods": ["POST", "OPTIONS"]
       },
       {
         "src": "/(send-support|search|store-recording)",

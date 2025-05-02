@@ -11,6 +11,17 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('.'));
 
+// Add CORS middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // MongoDB setup
 const uri = 'mongodb+srv://rjsadmin:VYdJT03rN8a6VMVd@rjsshuir.2fk6fuf.mongodb.net/rjs-shuir?retryWrites=true&w=majority';
 const client = new MongoClient(uri);
@@ -55,32 +66,57 @@ app.post('/send-support', async (req, res) => {
   }
 });
 
-// New endpoint to generate client-side upload URL
+// Updated generate-upload-url endpoint
 app.post('/generate-upload-url', async (req, res) => {
+  console.log('Received generate-upload-url request');
+  console.log('Request body:', req.body);
+  
   const { filename } = req.body;
   if (!filename) {
+    console.log('Missing filename in request');
     return res.status(400).json({ message: 'Filename is required.' });
   }
+  
   try {
-    const { url } = await generateClientUpload(`recordings/${Date.now()}_${filename}`, {
-      access: 'public',
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+    // Create a clean filename with timestamp to prevent conflicts
+    const cleanFilename = filename.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+    const timestampedFilename = `recordings/${Date.now()}_${cleanFilename}`;
+    
+    console.log('Generating client upload URL for:', timestampedFilename);
+    
+    const { url, token, downloadUrl } = await generateClientUpload({
+      pathname: timestampedFilename,
+      options: {
+        access: 'public',
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      }
     });
-    res.json({ uploadUrl: url });
+    
+    console.log('Generated URL successfully');
+    res.json({ 
+      uploadUrl: url,
+      downloadUrl: downloadUrl
+    });
   } catch (error) {
     console.error('Error generating upload URL:', error);
-    res.status(500).json({ message: 'Error generating upload URL.' });
+    res.status(500).json({ 
+      message: 'Error generating upload URL: ' + error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
-// GET endpoint to handle invalid method for generate-upload-url
-app.get('/generate-upload-url', (req, res) => {
-  res.status(405).json({ message: 'Method Not Allowed. Use POST to generate upload URL.' });
+// Explicit OPTIONS handler for generate-upload-url
+app.options('/generate-upload-url', (req, res) => {
+  res.sendStatus(200);
 });
 
 // Modified upload endpoint to store metadata only
 app.post('/store-recording', async (req, res) => {
   try {
+    console.log('Received store-recording request');
+    console.log('Request body:', req.body);
+    
     const { date, type, 'shiur-number': shiurNumber, 'mussar-name': mussarName, fileUrl } = req.body;
     if (!fileUrl || !date || !type) {
       return res.status(400).json({ message: 'Missing required fields.' });
@@ -96,18 +132,25 @@ app.post('/store-recording', async (req, res) => {
       fileUrl,
       uploadedAt: new Date(),
     };
-    await collection.insertOne(recording);
+    
+    const result = await collection.insertOne(recording);
+    console.log('Recording stored with ID:', result.insertedId);
 
-    res.json({ message: 'Recording metadata stored successfully!' });
+    res.json({ 
+      message: 'Recording uploaded and metadata stored successfully!',
+      recordingId: result.insertedId
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error storing recording metadata.' });
+    console.error('Error storing recording metadata:', error);
+    res.status(500).json({ message: 'Error storing recording metadata: ' + error.message });
   }
 });
 
 app.get('/search', async (req, res) => {
   try {
     const query = req.query.query || '';
+    console.log('Searching recordings with query:', query);
+    
     const collection = db.collection('recordings');
     const recordings = await collection
       .find({
@@ -118,16 +161,30 @@ app.get('/search', async (req, res) => {
           { mussarName: { $regex: query, $options: 'i' } },
         ],
       })
+      .sort({ uploadedAt: -1 }) // Show newest first
       .toArray();
+    
+    console.log(`Found ${recordings.length} matching recordings`);
     res.json(recordings);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error searching recordings.' });
+    console.error('Error searching recordings:', error);
+    res.status(500).json({ message: 'Error searching recordings: ' + error.message });
   }
 });
 
-app.listen(3000, () => {
-  console.log('Server running on http://localhost:3000');
+// Health check endpoint for debugging
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV || 'development',
+    blobEnabled: !!process.env.BLOB_READ_WRITE_TOKEN
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
 });
 
 module.exports = app;
