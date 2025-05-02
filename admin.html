@@ -195,6 +195,7 @@
         const data = await urlResponse.json();
         console.log('Upload URL response:', data);
         const uploadUrl = data.uploadUrl;
+        const downloadUrl = data.downloadUrl;
         
         if (!uploadUrl) {
           throw new Error('Failed to get upload URL.');
@@ -204,7 +205,7 @@
         message.textContent = 'Uploading file...';
         progressBar.style.width = '30%';
         
-        // Use fetch with PUT method to directly upload to Vercel Blob
+        // Create a new XMLHttpRequest to handle the upload
         const xhr = new XMLHttpRequest();
         xhr.open('PUT', uploadUrl, true);
         xhr.setRequestHeader('Content-Type', 'audio/mpeg');
@@ -220,7 +221,7 @@
         const uploadPromise = new Promise((resolve, reject) => {
           xhr.onload = function() {
             if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(uploadUrl.split('?')[0]); // Get the file URL without query parameters
+              resolve(downloadUrl);
             } else {
               reject(new Error(`Upload error: ${xhr.status} - ${xhr.statusText}`));
             }
