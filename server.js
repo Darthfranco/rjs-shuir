@@ -2,7 +2,7 @@ const express = require('express');
 const nodemailer = require('nodemailer');
 const dotenv = require('dotenv');
 const { MongoClient } = require('mongodb');
-const { put, del, head, generateClientUpload } = require('@vercel/blob');
+const { put } = require('@vercel/blob');
 
 dotenv.config();
 const app = express();
@@ -55,18 +55,21 @@ app.post('/send-support', async (req, res) => {
   }
 });
 
-// New endpoint to generate client-side upload URL
+// Updated endpoint to generate a signed upload URL
 app.post('/generate-upload-url', async (req, res) => {
   const { filename } = req.body;
   if (!filename) {
     return res.status(400).json({ message: 'Filename is required.' });
   }
   try {
-    const { url } = await generateClientUpload(`recordings/${Date.now()}_${filename}`, {
-      access: 'public',
+    // Generate a unique pathname for the blob
+    const pathname = `recordings/${Date.now()}_${filename}`;
+    // Return the pathname and token for client-side upload
+    res.json({
+      uploadUrl: `https://blob.vercel-storage.com/${pathname}`,
+      pathname,
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
-    res.json({ uploadUrl: url });
   } catch (error) {
     console.error('Error generating upload URL:', error);
     res.status(500).json({ message: 'Error generating upload URL.' });
@@ -127,7 +130,7 @@ app.get('/search', async (req, res) => {
 });
 
 app.listen(3000, () => {
-  console.log('Server running on http://localhost:3000');
+  console.log('Server running on http://localhost facilitation');
 });
 
 module.exports = app;

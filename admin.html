@@ -118,8 +118,8 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ filename: file.name }),
         });
-        const { uploadUrl } = await response.json();
-        if (!uploadUrl) {
+        const { uploadUrl, pathname, token } = await response.json();
+        if (!uploadUrl || !pathname || !token) {
           throw new Error('Failed to get upload URL.');
         }
 
@@ -127,11 +127,15 @@
         const uploadResponse = await fetch(uploadUrl, {
           method: 'PUT',
           body: file,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'x-vercel-blob-pathname': pathname,
+          },
         });
         if (!uploadResponse.ok) {
           throw new Error('Failed to upload file to Vercel Blob.');
         }
-        const fileUrl = uploadResponse.headers.get('x-vercel-blob-url') || uploadUrl.split('?')[0];
+        const fileUrl = uploadUrl;
 
         // Step 3: Store metadata in MongoDB
         const metadataResponse = await fetch('/store-recording', {
@@ -155,6 +159,5 @@
       }
     });
   </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93947ef729c70709',t:'MTc0NjE1NzIxMy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93984a686e78bca8',t:'MTc0NjE5NzAwMy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
