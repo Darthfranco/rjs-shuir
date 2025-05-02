@@ -6,7 +6,7 @@
   <title>RJS Shuir - Admin</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/@vercel/blob@0.23.4/dist/client/index.js"></script>
+  <script src="https://unpkg.com/@vercel/blob@latest/dist/client/index.js"></script>
   <style>
     body {
       background-color: #1a1a1a;
@@ -119,6 +119,13 @@
         return;
       }
 
+      // Check if Vercel Blob library is loaded
+      if (typeof window.VercelBlob === 'undefined') {
+        message.textContent = 'Error: Vercel Blob library failed to load.';
+        message.classList.add('text-red-400');
+        return;
+      }
+
       try {
         // Step 1: Get upload token from server
         const tokenResponse = await fetch('/generate-upload-token', {
@@ -133,7 +140,8 @@
         const { pathname, token } = tokenResult;
 
         // Step 2: Upload file to Vercel Blob client-side
-        const { url } = await VercelBlob.upload(pathname, file, {
+        const { upload } = window.VercelBlob;
+        const { url } = await upload(pathname, file, {
           access: 'public',
           token,
         });
