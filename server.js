@@ -11,11 +11,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('.'));
 
-// Add CORS middleware
+// Enhanced CORS middleware for better debugging
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  // Log incoming requests for debugging
+  console.log(`${req.method} ${req.path} - Headers:`, req.headers);
+  
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
@@ -23,7 +27,7 @@ app.use((req, res, next) => {
 });
 
 // MongoDB setup
-const uri = 'mongodb+srv://rjsadmin:VYdJT03rN8a6VMVd@rjsshuir.2fk6fuf.mongodb.net/rjs-shuir?retryWrites=true&w=majority';
+const uri = process.env.MONGODB_URI || 'mongodb+srv://rjsadmin:VYdJT03rN8a6VMVd@rjsshuir.2fk6fuf.mongodb.net/rjs-shuir?retryWrites=true&w=majority';
 const client = new MongoClient(uri);
 let db;
 
@@ -66,33 +70,38 @@ app.post('/send-support', async (req, res) => {
   }
 });
 
-// Updated generate-upload-url endpoint
+// Improved generate-upload-url endpoint with better error handling
 app.post('/generate-upload-url', async (req, res) => {
   console.log('Received generate-upload-url request');
   console.log('Request body:', req.body);
   
-  const { filename } = req.body;
-  if (!filename) {
-    console.log('Missing filename in request');
-    return res.status(400).json({ message: 'Filename is required.' });
-  }
-  
   try {
+    const { filename } = req.body;
+    if (!filename) {
+      console.log('Missing filename in request');
+      return res.status(400).json({ message: 'Filename is required.' });
+    }
+    
     // Create a clean filename with timestamp to prevent conflicts
     const cleanFilename = filename.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
     const timestampedFilename = `recordings/${Date.now()}_${cleanFilename}`;
     
     console.log('Generating client upload URL for:', timestampedFilename);
     
-    const { url, token, downloadUrl } = await generateClientUpload({
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      console.error('BLOB_READ_WRITE_TOKEN is missing');
+      return res.status(500).json({ message: 'Server configuration error: Missing Blob token' });
+    }
+    
+    const { url, downloadUrl } = await generateClientUpload({
       pathname: timestampedFilename,
       options: {
         access: 'public',
-        token: process.env.BLOB_READ_WRITE_TOKEN,
+        token: process.env.BLOB_READ_WRITE_TOKEN
       }
     });
     
-    console.log('Generated URL successfully');
+    console.log('Generated URL successfully:', { uploadUrl: url, downloadUrl });
     res.json({ 
       uploadUrl: url,
       downloadUrl: downloadUrl
@@ -104,11 +113,6 @@ app.post('/generate-upload-url', async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
-});
-
-// Explicit OPTIONS handler for generate-upload-url
-app.options('/generate-upload-url', (req, res) => {
-  res.sendStatus(200);
 });
 
 // Modified upload endpoint to store metadata only
@@ -172,13 +176,15 @@ app.get('/search', async (req, res) => {
   }
 });
 
-// Health check endpoint for debugging
+// Enhanced health check endpoint for debugging
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
     env: process.env.NODE_ENV || 'development',
-    blobEnabled: !!process.env.BLOB_READ_WRITE_TOKEN
+    blobEnabled: !!process.env.BLOB_READ_WRITE_TOKEN,
+    nodeVersion: process.version,
+    blobVersion: require('@vercel/blob/package.json').version || 'unknown'
   });
 });
 

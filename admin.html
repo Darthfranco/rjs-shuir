@@ -97,6 +97,10 @@
       </form>
       <p id="upload-message" class="mt-4 text-center"></p>
     </div>
+    <div class="mt-4 text-center">
+      <a href="#" onclick="runHealthCheck(); return false;" class="nav-gold">Check API Status</a>
+      <div id="health-status" class="mt-2 text-xs"></div>
+    </div>
   </div>
   <script>
     function checkPassword() {
@@ -113,6 +117,28 @@
       const type = document.getElementById('type').value;
       document.getElementById('shiur-field').classList.toggle('hidden', type !== 'Shiur');
       document.getElementById('mussar-field').classList.toggle('hidden', type !== 'Mussar');
+    }
+
+    // Health check function to help debug API issues
+    async function runHealthCheck() {
+      const healthStatus = document.getElementById('health-status');
+      healthStatus.textContent = 'Checking API health...';
+      try {
+        const response = await fetch('/api/health');
+        if (response.ok) {
+          const data = await response.json();
+          healthStatus.innerHTML = `
+            <span class="text-green-400">✓ API is healthy</span><br>
+            Time: ${data.timestamp}<br>
+            Environment: ${data.env}<br>
+            Blob Enabled: ${data.blobEnabled}
+          `;
+        } else {
+          healthStatus.innerHTML = `<span class="text-red-400">✗ API Error: ${response.status} ${response.statusText}</span>`;
+        }
+      } catch (error) {
+        healthStatus.innerHTML = `<span class="text-red-400">✗ API Connection Error: ${error.message}</span>`;
+      }
     }
 
     document.getElementById('upload-form').addEventListener('submit', async (e) => {
@@ -144,21 +170,30 @@
       }
 
       try {
-        // Step 1: Get upload URL from server
+        // Log the file details to debug
+        message.textContent = `Preparing file: ${file.name} (${Math.round(file.size/1024)} KB)`;
+        progressBar.style.width = '5%';
+
+        // Step 1: Get upload URL from server - make sure to use POST method
         message.textContent = 'Requesting upload URL...';
         progressBar.style.width = '10%';
         
         const response = await fetch('/generate-upload-url', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
           body: JSON.stringify({ filename: file.name }),
         });
         
         if (!response.ok) {
-          throw new Error(`Server error: ${response.status} - ${response.statusText}`);
+          const errorText = await response.text();
+          throw new Error(`Server error: ${response.status} - ${response.statusText} - ${errorText}`);
         }
         
         const data = await response.json();
+        console.log('Upload URL response:', data);
         const uploadUrl = data.uploadUrl;
         
         if (!uploadUrl) {
@@ -172,7 +207,7 @@
         // Create XMLHttpRequest for progress monitoring
         const xhr = new XMLHttpRequest();
         xhr.open('PUT', uploadUrl, true);
-        xhr.setRequestHeader('Content-Type', file.type);
+        xhr.setRequestHeader('Content-Type', file.type || 'audio/mpeg');
         
         xhr.upload.onprogress = function(event) {
           if (event.lengthComputable) {
@@ -185,7 +220,8 @@
         const uploadPromise = new Promise((resolve, reject) => {
           xhr.onload = function() {
             if (xhr.status >= 200 && xhr.status < 300) {
-              const fileUrl = xhr.getResponseHeader('x-vercel-blob-url') || uploadUrl.split('?')[0];
+              // Try to get the Vercel Blob URL from response headers
+              const fileUrl = xhr.getResponseHeader('x-vercel-blob-url') || data.downloadUrl || uploadUrl.split('?')[0];
               resolve(fileUrl);
             } else {
               reject(new Error(`Upload error: ${xhr.status} - ${xhr.statusText}`));
@@ -198,6 +234,7 @@
         
         xhr.send(file);
         const fileUrl = await uploadPromise;
+        console.log('File uploaded to:', fileUrl);
 
         // Step 3: Store metadata in MongoDB
         message.textContent = 'Storing recording metadata...';
@@ -216,7 +253,8 @@
         });
         
         if (!metadataResponse.ok) {
-          throw new Error(`Metadata error: ${metadataResponse.status} - ${metadataResponse.statusText}`);
+          const errorText = await metadataResponse.text();
+          throw new Error(`Metadata error: ${metadataResponse.status} - ${metadataResponse.statusText} - ${errorText}`);
         }
         
         const result = await metadataResponse.json();

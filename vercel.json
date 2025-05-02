@@ -12,13 +12,29 @@
     ],
     "routes": [
       {
+        "src": "/api/health",
+        "dest": "/server.js",
+        "methods": ["GET"]
+      },
+      {
         "src": "/generate-upload-url",
         "dest": "/server.js",
         "methods": ["POST", "OPTIONS"]
       },
       {
-        "src": "/(send-support|search|store-recording)",
-        "dest": "/server.js"
+        "src": "/store-recording",
+        "dest": "/server.js",
+        "methods": ["POST", "OPTIONS"]
+      },
+      {
+        "src": "/send-support",
+        "dest": "/server.js",
+        "methods": ["POST", "OPTIONS"]
+      },
+      {
+        "src": "/search",
+        "dest": "/server.js",
+        "methods": ["GET"]
       },
       {
         "src": "/(.*\\.(html|css|js|png|jpg|jpeg|gif|ico|svg|mp3))",
