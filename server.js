@@ -1,13 +1,11 @@
 const express = require('express');
 const nodemailer = require('nodemailer');
 const dotenv = require('dotenv');
-const multer = require('multer');
 const { MongoClient } = require('mongodb');
-const { put } = require('@vercel/blob');
+const { put, del, head, generateClientUpload } = require('@vercel/blob'); // Add generateClientUpload
 
 dotenv.config();
 const app = express();
-const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -35,7 +33,6 @@ app.get('/', (req, res) => {
 
 app.post('/send-support', async (req, res) => {
   const { name, email, problem } = req.body;
-
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -43,14 +40,12 @@ app.post('/send-support', async (req, res) => {
       pass: process.env.EMAIL_PASS,
     },
   });
-
   const mailOptions = {
     from: email,
     to: process.env.EMAIL_USER,
     subject: `Tech Support Request from ${name}`,
     text: `Name: ${name}\nEmail: ${email}\nProblem: ${problem}`,
   };
-
   try {
     await transporter.sendMail(mailOptions);
     res.json({ message: 'Support request sent successfully!' });
@@ -60,18 +55,31 @@ app.post('/send-support', async (req, res) => {
   }
 });
 
-app.post('/upload', upload.single('file'), async (req, res) => {
+// New endpoint to generate client-side upload URL
+app.post('/generate-upload-url', async (req, res) => {
+  const { filename } = req.body;
+  if (!filename) {
+    return res.status(400).json({ message: 'Filename is required.' });
+  }
   try {
-    const { date, type, 'shiur-number': shiurNumber, 'mussar-name': mussarName } = req.body;
-    if (!req.file || !date || !type) {
+    const { url } = await generateClientUpload(`recordings/${Date.now()}_${filename}`, {
+      access: 'public',
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+    res.json({ uploadUrl: url });
+  } catch (error) {
+    console.error('Error generating upload URL:', error);
+    res.status(500).json({ message: 'Error generating upload URL.' });
+  }
+});
+
+// Modified upload endpoint to store metadata only
+app.post('/store-recording', async (req, res) => {
+  try {
+    const { date, type, 'shiur-number': shiurNumber, 'mussar-name': mussarName, fileUrl } = req.body;
+    if (!fileUrl || !date || !type) {
       return res.status(400).json({ message: 'Missing required fields.' });
     }
-
-    // Upload file to Vercel Blob
-    const blob = await put(`recordings/${Date.now()}_${req.file.originalname}`, req.file.buffer, {
-      access: 'public',
-      token: process.env.BLOB_READ_WRITE_TOKEN, // Set during Vercel deployment
-    });
 
     // Store metadata in MongoDB
     const collection = db.collection('recordings');
@@ -80,15 +88,15 @@ app.post('/upload', upload.single('file'), async (req, res) => {
       type,
       ...(type === 'Shiur' && { shiurNumber }),
       ...(type === 'Mussar' && { mussarName }),
-      fileUrl: blob.url,
+      fileUrl,
       uploadedAt: new Date(),
     };
     await collection.insertOne(recording);
 
-    res.json({ message: 'Recording uploaded successfully!' });
+    res.json({ message: 'Recording metadata stored successfully!' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Error uploading recording.' });
+    res.status(500).json({ message: 'Error storing recording metadata.' });
   }
 });
 

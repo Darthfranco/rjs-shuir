@@ -55,7 +55,7 @@
         <input type="password" id="admin-password" class="w-full p-2 rounded bg-gray-800 text-white border border-gray-600 mb-4" />
         <button onclick="checkPassword()" class="btn-gold w-full py-2 rounded">Unlock</button>
       </div>
-      <form id="upload-form" class="hidden" enctype="multipart/form-data">
+      <form id="upload-form" class="hidden">
         <label for="file" class="block text-gray-300 mb-2">Select Recording (MP3, max 2 hours)</label>
         <input type="file" id="file" name="file" accept=".mp3" class="w-full p-2 rounded bg-gray-800 text-white border border-gray-600 mb-4" required />
         <label for="date" class="block text-gray-300 mb-2">Date</label>
@@ -97,22 +97,64 @@
 
     document.getElementById('upload-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const formData = new FormData(e.target);
       const message = document.getElementById('upload-message');
+      const fileInput = document.getElementById('file');
+      const file = fileInput.files[0];
+      const date = document.getElementById('date').value;
+      const type = document.getElementById('type').value;
+      const shiurNumber = document.getElementById('shiur-number').value;
+      const mussarName = document.getElementById('mussar-name').value;
+
+      if (!file || !date || !type) {
+        message.textContent = 'Missing required fields.';
+        message.classList.add('text-red-400');
+        return;
+      }
+
       try {
-        const response = await fetch('/upload', {
+        // Step 1: Get upload URL from server
+        const response = await fetch('/generate-upload-url', {
           method: 'POST',
-          body: formData,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: file.name }),
         });
-        const result = await response.json();
+        const { uploadUrl } = await response.json();
+        if (!uploadUrl) {
+          throw new Error('Failed to get upload URL.');
+        }
+
+        // Step 2: Upload file to Vercel Blob
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'PUT',
+          body: file,
+        });
+        if (!uploadResponse.ok) {
+          throw new Error('Failed to upload file to Vercel Blob.');
+        }
+        const fileUrl = uploadResponse.headers.get('x-vercel-blob-url') || uploadUrl.split('?')[0];
+
+        // Step 3: Store metadata in MongoDB
+        const metadataResponse = await fetch('/store-recording', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date,
+            type,
+            'shiur-number': type === 'Shiur' ? shiurNumber : undefined,
+            'mussar-name': type === 'Mussar' ? mussarName : undefined,
+            fileUrl,
+          }),
+        });
+        const result = await metadataResponse.json();
         message.textContent = result.message;
         message.classList.add('text-green-400');
         e.target.reset();
       } catch (error) {
-        message.textContent = 'Error uploading recording.';
+        message.textContent = 'Error uploading recording: ' + error.message;
         message.classList.add('text-red-400');
       }
     });
   </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93947ef729c70709',t:'MTc0NjE1NzIxMy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
