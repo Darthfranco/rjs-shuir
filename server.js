@@ -14,8 +14,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static('.'));
 
 // MongoDB setup
-const uri = process.env.MONGODB_URI || 'mongodb+srv://rjsadmin:VYdJT03rN8a6VMVd@rjsshuir.2fk6fuf.mongodb.net/rjs-shuir?retryWrites=true&w=majority';
-const client = new MongoClient(uri, { connectTimeoutMS: 10000, serverSelectionTimeoutMS: 10000 });
+const uri = 'mongodb+srv://rjsadmin:VYdJT03rN8a6VMVd@rjsshuir.2fk6fuf.mongodb.net/rjs-shuir?retryWrites=true&w=majority';
+const client = new MongoClient(uri);
 let db;
 
 async function connectDB() {
@@ -24,8 +24,7 @@ async function connectDB() {
     db = client.db('rjs-shuir');
     console.log('Connected to MongoDB');
   } catch (error) {
-    console.error('MongoDB connection error:', error.message, error.stack);
-    throw error;
+    console.error('MongoDB connection error:', error);
   }
 }
 connectDB();
@@ -35,32 +34,29 @@ app.get('/', (req, res) => {
 });
 
 app.post('/send-support', async (req, res) => {
+  const { name, email, problem } = req.body;
+
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  const mailOptions = {
+    from: email,
+    to: process.env.EMAIL_USER,
+    subject: `Tech Support Request from ${name}`,
+    text: `Name: ${name}\nEmail: ${email}\nProblem: ${problem}`,
+  };
+
   try {
-    const { name, email, problem } = req.body;
-    if (!name || !email || !problem) {
-      return res.status(400).json({ message: 'Missing required fields.' });
-    }
-
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    const mailOptions = {
-      from: email,
-      to: process.env.EMAIL_USER,
-      subject: `Tech Support Request from ${name}`,
-      text: `Name: ${name}\nEmail: ${email}\nProblem: ${problem}`,
-    };
-
     await transporter.sendMail(mailOptions);
     res.json({ message: 'Support request sent successfully!' });
   } catch (error) {
-    console.error('Error sending support email:', error.message, error.stack);
-    res.status(500).json({ message: 'Error sending support request.', error: error.message });
+    console.error(error);
+    res.status(500).json({ message: 'Error sending support request.' });
   }
 });
 
@@ -68,29 +64,16 @@ app.post('/upload', upload.single('file'), async (req, res) => {
   try {
     const { date, type, 'shiur-number': shiurNumber, 'mussar-name': mussarName } = req.body;
     if (!req.file || !date || !type) {
-      console.error('Missing required fields:', { file: !!req.file, date, type });
       return res.status(400).json({ message: 'Missing required fields.' });
     }
 
-    // Verify Blob token
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      console.error('BLOB_READ_WRITE_TOKEN is missing');
-      return res.status(500).json({ message: 'Server configuration error: Missing Blob token.' });
-    }
-
     // Upload file to Vercel Blob
-    console.log('Uploading to Vercel Blob:', req.file.originalname);
     const blob = await put(`recordings/${Date.now()}_${req.file.originalname}`, req.file.buffer, {
       access: 'public',
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+      token: process.env.BLOB_READ_WRITE_TOKEN, // Set during Vercel deployment
     });
-    console.log('Blob upload successful:', blob.url);
 
     // Store metadata in MongoDB
-    if (!db) {
-      console.error('MongoDB not connected');
-      return res.status(500).json({ message: 'Database not connected.' });
-    }
     const collection = db.collection('recordings');
     const recording = {
       date,
@@ -100,24 +83,18 @@ app.post('/upload', upload.single('file'), async (req, res) => {
       fileUrl: blob.url,
       uploadedAt: new Date(),
     };
-    console.log('Inserting to MongoDB:', recording);
     await collection.insertOne(recording);
-    console.log('MongoDB insert successful');
 
     res.json({ message: 'Recording uploaded successfully!' });
   } catch (error) {
-    console.error('Error uploading recording:', error.message, error.stack);
-    res.status(500).json({ message: 'Error uploading recording.', error: error.message });
+    console.error(error);
+    res.status(500).json({ message: 'Error uploading recording.' });
   }
 });
 
 app.get('/search', async (req, res) => {
   try {
     const query = req.query.query || '';
-    if (!db) {
-      console.error('MongoDB not connected');
-      return res.status(500).json({ message: 'Database not connected.' });
-    }
     const collection = db.collection('recordings');
     const recordings = await collection
       .find({
@@ -131,10 +108,13 @@ app.get('/search', async (req, res) => {
       .toArray();
     res.json(recordings);
   } catch (error) {
-    console.error('Error searching recordings:', error.message, error.stack);
-    res.status(500).json({ message: 'Error searching recordings.', error: error.message });
+    console.error(error);
+    res.status(500).json({ message: 'Error searching recordings.' });
   }
 });
 
-// Export for Vercel serverless
+app.listen(3000, () => {
+  console.log('Server running on http://localhost:3000');
+});
+
 module.exports = app;
