@@ -2,7 +2,7 @@ const express = require('express');
 const nodemailer = require('nodemailer');
 const dotenv = require('dotenv');
 const { MongoClient } = require('mongodb');
-const { put, list, generateClientUploadUrl } = require('@vercel/blob');
+const { handleUpload } = require('@vercel/blob');
 
 dotenv.config();
 const app = express();
@@ -70,47 +70,62 @@ app.post('/send-support', async (req, res) => {
   }
 });
 
-// Fixed generate-upload-url endpoint with proper client upload URL generation
+// Fixed generate-upload-url endpoint using Vercel Blob's handleUpload
 app.post('/generate-upload-url', async (req, res) => {
   console.log('Received generate-upload-url request');
   console.log('Request body:', req.body);
-  
+
   try {
     const { filename } = req.body;
     if (!filename) {
       console.log('Missing filename in request');
       return res.status(400).json({ message: 'Filename is required.' });
     }
-    
+
     // Create a clean filename with timestamp to prevent conflicts
     const cleanFilename = filename.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
     const timestampedFilename = `recordings/${Date.now()}_${cleanFilename}`;
-    
-    console.log('Generating client upload URL for:', timestampedFilename);
-    
+
+    console.log('Generating client upload token for:', timestampedFilename);
+
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
       console.error('BLOB_READ_WRITE_TOKEN is missing');
       return res.status(500).json({ message: 'Server configuration error: Missing Blob token' });
     }
-    
-    // Use the correct function for client-side uploads
-    const { url, uploadUrl } = await generateClientUploadUrl(timestampedFilename, {
-      access: 'public',
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-      handleUploadUrl: '/handle-upload',
-      multipart: false
+
+    // Use handleUpload to generate a token for client-side upload
+    const jsonResponse = await handleUpload({
+      body: {
+        pathname: timestampedFilename,
+        contentType: 'audio/mpeg',
+        access: 'public',
+      },
+      request: req,
+      onBeforeGenerateToken: async (pathname /*, clientPayload */) => {
+        // Optional: Add authentication or validation here
+        return {
+          allowedContentTypes: ['audio/mpeg'], // Restrict to MP3 files
+          tokenPayload: JSON.stringify({
+            // Add custom metadata if needed
+            timestamp: Date.now(),
+          }),
+        };
+      },
+      onUploadCompleted: async ({ blob, tokenPayload }) => {
+        console.log('Upload completed:', blob, tokenPayload);
+      },
     });
-    
-    console.log('Generated URL successfully:', { uploadUrl, url });
-    res.json({ 
-      uploadUrl,
-      downloadUrl: url
+
+    console.log('Generated upload token successfully:', jsonResponse);
+    res.json({
+      uploadUrl: jsonResponse.url, // URL for client to upload the file
+      downloadUrl: jsonResponse.downloadUrl, // URL to access the uploaded file
     });
   } catch (error) {
     console.error('Error generating upload URL:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Error generating upload URL: ' + error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 });
