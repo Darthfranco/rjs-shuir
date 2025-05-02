@@ -14,13 +14,16 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static('.'));
 
 // MongoDB setup
-const uri = process.env.MONGODB_URI;
-const client = new MongoClient(uri);
+const uri = process.env.MONGODB_URI || '';
+const client = new MongoClient(uri, { connectTimeoutMS: 10000, serverSelectionTimeoutMS: 10000 });
 let db;
 
 async function connectDB() {
   if (db) return db;
   try {
+    if (!uri) {
+      throw new Error('MONGODB_URI is not defined');
+    }
     await client.connect();
     db = client.db('rjs-shuir');
     console.log('Connected to MongoDB');
@@ -35,9 +38,13 @@ async function connectDB() {
 app.use(async (req, res, next) => {
   try {
     await connectDB();
+    if (!db) {
+      throw new Error('Database not initialized');
+    }
     next();
   } catch (error) {
-    res.status(500).json({ message: 'Database connection failed.' });
+    console.error('Database middleware error:', error.message, error.stack);
+    res.status(500).json({ message: 'Database connection failed.', error: error.message });
   }
 });
 
@@ -68,7 +75,7 @@ app.post('/api/send-support', async (req, res) => {
     res.json({ message: 'Support request sent successfully!' });
   } catch (error) {
     console.error('Error sending support email:', error.message, error.stack);
-    res.status(500).json({ message: 'Error sending support request.' });
+    res.status(500).json({ message: 'Error sending support request.', error: error.message });
   }
 });
 
@@ -83,7 +90,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     // Verify Blob token
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
       console.error('BLOB_READ_WRITE_TOKEN is missing');
-      return res.status(500).json({ message: 'Server configuration error.' });
+      return res.status(500).json({ message: 'Server configuration error: Missing Blob token.' });
     }
 
     // Upload to Vercel Blob
@@ -132,7 +139,7 @@ app.get('/api/search', async (req, res) => {
     res.json(recordings);
   } catch (error) {
     console.error('Error searching recordings:', error.message, error.stack);
-    res.status(500).json({ message: 'Error searching recordings.' });
+    res.status(500).json({ message: 'Error searching recordings.', error: error.message });
   }
 });
 
