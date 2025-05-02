@@ -2,7 +2,7 @@ const express = require('express');
 const nodemailer = require('nodemailer');
 const dotenv = require('dotenv');
 const { MongoClient } = require('mongodb');
-const { put, del, head, generateClientUpload } = require('@vercel/blob'); // Add generateClientUpload
+const { put, del, head, generateClientUpload } = require('@vercel/blob');
 
 dotenv.config();
 const app = express();
@@ -71,6 +71,11 @@ app.post('/generate-upload-url', async (req, res) => {
     console.error('Error generating upload URL:', error);
     res.status(500).json({ message: 'Error generating upload URL.' });
   }
+});
+
+// GET endpoint to handle invalid method for generate-upload-url
+app.get('/generate-upload-url', (req, res) => {
+  res.status(405).json({ message: 'Method Not Allowed. Use POST to generate upload URL.' });
 });
 
 // Modified upload endpoint to store metadata only
