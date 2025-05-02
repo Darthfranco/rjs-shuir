@@ -3,86 +3,678 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RJS Shuir - Tech Support</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <title>RJS Shuir - Support</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
+    :root {
+      --primary: #d4af37;
+      --primary-hover: #f0c14b;
+      --bg-dark: #0f0f0f;
+      --bg-darker: #0a0a0a;
+      --bg-card: #1a1a1a;
+      --text-primary: #f5f5f5;
+      --text-secondary: #d1d5db;
+    }
+    
     body {
-      background-color: #1a1a1a;
-      color: #e5e5e5;
+      background-color: var(--bg-dark);
+      color: var(--text-primary);
       font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
-    .nav-gold {
-      color: #d4af37;
+    
+    .gold-gradient {
+      background: linear-gradient(135deg, var(--primary) 0%, #f0c14b 100%);
     }
-    .nav-gold:hover {
-      color: #f0c14b;
+    
+    .gold-text {
+      color: var(--primary);
     }
+    
+    .gold-border {
+      border-color: var(--primary);
+    }
+    
     .btn-gold {
-      background-color: #d4af37;
-      color: #1a1a1a;
-      transition: transform 0.2s;
+      background-color: var(--primary);
+      color: var(--bg-darker);
+      transition: all 0.3s ease;
     }
+    
     .btn-gold:hover {
-      background-color: #f0c14b;
-      transform: scale(1.05);
+      background-color: var(--primary-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
-    .form-container {
-      max-width: 600px;
-      background-color: #2a2a2a;
-      padding: 2rem;
-      border-radius: 0.5rem;
-      border: 1px solid #d4af37;
+    
+    .nav-link {
+      position: relative;
+      transition: all 0.3s ease;
+    }
+    
+    .nav-link:hover {
+      color: var(--primary);
+    }
+    
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      width: 0;
+      height: 2px;
+      bottom: -2px;
+      left: 0;
+      background-color: var(--primary);
+      transition: width 0.3s ease;
+    }
+    
+    .nav-link:hover::after {
+      width: 100%;
+    }
+    
+    .support-card {
+      background-color: var(--bg-card);
+      transition: all 0.3s ease;
+      border-left: 4px solid transparent;
+    }
+    
+    .support-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2);
+      border-left: 4px solid var(--primary);
+    }
+    
+    .footer {
+      background-color: var(--bg-darker);
+    }
+    
+    .input-field {
+      background-color: var(--bg-card);
+      border: 1px solid #333;
+      transition: all 0.3s ease;
+    }
+    
+    .input-field:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
+    }
+    
+    .section-title {
+      position: relative;
+      display: inline-block;
+    }
+    
+    .section-title::after {
+      content: '';
+      position: absolute;
+      width: 60%;
+      height: 3px;
+      bottom: -8px;
+      left: 20%;
+      background: linear-gradient(90deg, var(--primary) 0%, transparent 100%);
+      border-radius: 3px;
+    }
+    
+    .accordion-item {
+      border-bottom: 1px solid #333;
+    }
+    
+    .accordion-header {
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .accordion-header:hover {
+      color: var(--primary);
+    }
+    
+    .accordion-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+    
+    .accordion-item.active .accordion-content {
+      max-height: 500px;
+    }
+    
+    .contact-icon {
+      width: 60px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background-color: var(--bg-card);
+      transition: all 0.3s ease;
+    }
+    
+    .contact-icon:hover {
+      background-color: var(--primary);
+      color: var(--bg-darker);
+      transform: scale(1.1);
     }
   </style>
 </head>
 <body>
-  <nav class="bg-black p-4">
-    <div class="container mx-auto flex justify-between items-center">
-      <h1 class="text-xl text-white">RJS Shuir</h1>
-      <div>
-        <a href="index.html" class="nav-gold mr-4">Home</a>
-        <a href="recordings.html" class="nav-gold mr-4">Recordings</a>
-        <a href="support.html" class="nav-gold">Tech Support</a>
+  <!-- Navigation -->
+  <nav class="bg-black/90 backdrop-blur-md sticky top-0 z-50 border-b border-gray-800">
+    <div class="container mx-auto px-6 py-4">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+          <i class="fas fa-microphone-alt text-2xl gold-text"></i>
+          <a href="index.html" class="text-2xl font-bold text-white hover:text-primary transition-colors">
+            RJS <span class="gold-text">Shuir</span>
+          </a>
+        </div>
+        
+        <div class="hidden md:flex items-center space-x-8">
+          <a href="index.html" class="nav-link text-white font-medium">Home</a>
+          <a href="recordings.html" class="nav-link text-white font-medium">Recordings</a>
+          <a href="support.html" class="nav-link text-white font-medium gold-text">Support</a>
+          <a href="recordings.html" class="btn-gold px-6 py-2 rounded-full font-semibold flex items-center space-x-2">
+            <i class="fas fa-headphones"></i>
+            <span>Listen Now</span>
+          </a>
+        </div>
+        
+        <button class="md:hidden text-white focus:outline-none">
+          <i class="fas fa-bars text-2xl"></i>
+        </button>
       </div>
     </div>
   </nav>
-  <div class="container mx-auto p-4">
-    <div class="form-container mx-auto">
-      <h2 class="text-2xl font-semibold text-white mb-4 text-center">Tech Support</h2>
-      <form id="support-form">
-        <label for="name" class="block text-gray-300 mb-2">Name</label>
-        <input type="text" id="name" name="name" class="w-full p-2 rounded bg-gray-800 text-white border border-gray-600 mb-4" required />
-        <label for="email" class="block text-gray-300 mb-2">Email</label>
-        <input type="email" id="email" name="email" class="w-full p-2 rounded bg-gray-800 text-white border border-gray-600 mb-4" required />
-        <label for="problem" class="block text-gray-300 mb-2">Describe Your Issue</label>
-        <textarea id="problem" name="problem" class="w-full p-2 rounded bg-gray-800 text-white border border-gray-600 mb-4" rows="5" required></textarea>
-        <button type="submit" class="btn-gold w-full py-2 rounded">Send Request</button>
-      </form>
-      <p id="support-message" class="mt-4 text-center"></p>
+
+  <!-- Main Content -->
+  <main class="flex-grow py-12">
+    <div class="container mx-auto px-6">
+      <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl md:text-4xl font-bold mb-2 text-center section-title">
+          Technical <span class="gold-text">Support</span>
+        </h1>
+        <p class="text-lg text-gray-400 mb-10 text-center">
+          Get help with any technical issues or questions about our service
+        </p>
+        
+        <!-- Support Cards -->
+        <div class="grid md:grid-cols-2 gap-6 mb-12">
+          <!-- FAQ Card -->
+          <div class="support-card p-6 rounded-xl border border-gray-800">
+            <div class="flex items-center mb-4">
+              <div class="gold-gradient w-12 h-12 rounded-full flex items-center justify-center mr-4">
+                <i class="fas fa-question text-xl text-black"></i>
+              </div>
+              <h3 class="text-xl font-semibold">Frequently Asked Questions</h3>
+            </div>
+            <p class="text-gray-400 mb-4">
+              Find answers to common questions about using our service, downloading recordings, and more.
+            </p>
+            <button 
+              onclick="scrollToSection('faq')" 
+              class="btn-gold px-6 py-2 rounded-lg font-medium inline-flex items-center space-x-2"
+            >
+              <i class="fas fa-book-open"></i>
+              <span>View FAQs</span>
+            </button>
+          </div>
+          
+          <!-- Contact Card -->
+          <div class="support-card p-6 rounded-xl border border-gray-800">
+            <div class="flex items-center mb-4">
+              <div class="gold-gradient w-12 h-12 rounded-full flex items-center justify-center mr-4">
+                <i class="fas fa-envelope text-xl text-black"></i>
+              </div>
+              <h3 class="text-xl font-semibold">Contact Support</h3>
+            </div>
+            <p class="text-gray-400 mb-4">
+              Can't find what you're looking for? Reach out to our support team for personalized assistance.
+            </p>
+            <button 
+              onclick="scrollToSection('contact')" 
+              class="btn-gold px-6 py-2 rounded-lg font-medium inline-flex items-center space-x-2"
+            >
+              <i class="fas fa-headset"></i>
+              <span>Contact Us</span>
+            </button>
+          </div>
+        </div>
+        
+        <!-- FAQ Section -->
+        <div id="faq" class="mb-16">
+          <h2 class="text-2xl font-bold mb-6 gold-text">Frequently Asked Questions</h2>
+          
+          <div class="space-y-4">
+            <!-- FAQ Item 1 -->
+            <div class="accordion-item">
+              <div class="accordion-header p-4 flex justify-between items-center cursor-pointer">
+                <h3 class="font-semibold">How do I download recordings?</h3>
+                <i class="fas fa-chevron-down transition-transform duration-300"></i>
+              </div>
+              <div class="accordion-content px-4">
+                <div class="pb-4 text-gray-4
+System: You are Grok 3 built by xAI.
+
+I've reviewed the provided HTML files and will help merge the visual elements from the "nice" version into the functional version while preserving all functionality. The functional version (index.html) is a homepage, while the nice version (support.html) is a support page with enhanced styling, additional sections (FAQ, contact form, footer), and JavaScript for interactivity. The goal is to apply the visual enhancements and structure from the nice version to the functional homepage, ensuring all existing functionality (navigation, buttons, and links) remains intact.
+
+### Approach:
+1. **Preserve Functionality**: Keep the navigation bar, homepage content (title, description, buttons), and links from the functional version.
+2. **Incorporate Visual Elements**: Apply the CSS variables, styles, Font Awesome icons, gradient effects, hover animations, and layout structure (header, main, footer) from the nice version.
+3. **Adapt Structure**: Use the container-based layout, responsive design, and modern styling (e.g., sticky nav, backdrop blur) from the nice version.
+4. **Maintain Interactivity**: Include relevant JavaScript (e.g., scroll-to-section) and ensure buttons remain functional.
+5. **Homepage Focus**: Since the functional version is a homepage, exclude support-specific sections (FAQ, contact form) but include the footer and general styling.
+
+### Key Changes:
+- Replace the Tailwind CSS link with the script tag from the nice version for latest Tailwind features.
+- Update the font import to include additional weights (300, 500, 700) as in the nice version.
+- Add Font Awesome for icons.
+- Apply the `:root` CSS variables and styles (e.g., `--primary`, `--bg-dark`, `.gold-gradient`, `.btn-gold`) from the nice version.
+- Enhance the navigation with icons, hover effects, and a sticky backdrop-blur effect.
+- Style the main content with a centered, modern layout and animated buttons.
+- Add the footer from the nice version for consistency.
+- Include minimal JavaScript for button interactions (e.g., scroll-to-section).
+
+Below is the updated `index.html` with the functional content and visual enhancements.
+
+<xaiArtifact artifact_id="e594049c-c218-435d-9352-54f54143ca48" artifact_version_id="68017be8-b214-4336-a912-9f1af9dd05d0" title="index.html" contentType="text/html">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RJS Shuir - Home</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --primary: #d4af37;
+      --primary-hover: #f0c14b;
+      --bg-dark: #0f0f0f;
+      --bg-darker: #0a0a0a;
+      --bg-card: #1a1a1a;
+      --text-primary: #f5f5f5;
+      --text-secondary: #d1d5db;
+    }
+    
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .gold-gradient {
+      background: linear-gradient(135deg, var(--primary) 0%, #f0c14b 100%);
+    }
+    
+    .gold-text {
+      color: var(--primary);
+    }
+    
+    .btn-gold {
+      background-color: var(--primary);
+      color: var(--bg-d darker);
+      transition: all 0.3s ease;
+    }
+    
+    .btn-gold:hover {
+      background-color: var(--primary-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .nav-link {
+      position: relative;
+      transition: all 0.3s ease;
+    }
+    
+    .nav-link:hover {
+      color: var(--primary);
+    }
+    
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      width: 0;
+      height: 2px;
+      bottom: -2px;
+      left: 0;
+      background-color: var(--primary);
+      transition: width 0.3s ease;
+    }
+    
+    .nav-link:hover::after {
+      width: 100%;
+    }
+    
+    .footer {
+      background-color: var(--bg-darker);
+    }
+    
+    .section-title {
+      position: relative;
+      display: inline-block;
+    }
+    
+    .section-title::after {
+      content: '';
+      position: absolute;
+      width: 60%;
+      height: 3px;
+      bottom: -8px;
+      left: 20%;
+      background: linear-gradient(90deg, var(--primary) 0%, transparent 100%);
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="bg-black/90 backdrop-blur-md sticky top-0 z-50 border-b border-gray-800">
+    <div class="container mx-auto px-6 py-4">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+          <i class="fas fa-microphone-alt text-2xl gold-text"></i>
+          <a href="index.html" class="text-2xl font-bold text-white hover:text-primary transition-colors">
+            RJS <span class="gold-text">Shuir</span>
+          </a>
+        </div>
+        
+        <div class="hidden md:flex items-center space-x-8">
+          <a href="index.html" class="nav-link text-white font-medium gold-text">Home</a>
+          <a href="recordings.html" class="nav-link text-white font-medium">Recordings</a>
+          <a href="support.html" class="nav-link text-white font-medium">Support</a>
+          <a href="recordings.html" class="btn-gold px-6 py-2 rounded-full font-semibold flex items-center space-x-2">
+            <i class="fas fa-headphones"></i>
+            <span>Listen Now</span>
+          </a>
+        </div>
+        
+        <button class="md:hidden text-white focus:outline-none">
+          <i class="fas fa-bars text-2xl"></i>
+        </button>
+      </div>
     </div>
-  </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="flex-grow py-12">
+    <div class="container mx-auto px-6 text-center">
+      <h2 class="text-3xl md:text-4xl font-bold mb-2 section-title text-white">
+        Welcome to <span class="gold-text">RJS Shuir</span>
+      </h2>
+      <p class="text-lg text-gray-400 mb-10 max-w-2xl mx-auto">
+        Discover our collection of Shiur and Mussar recordings. Search, listen, or download with ease.
+      </p>
+      <div class="flex justify-center space-x-4">
+        <a href="recordings.html" class="btn-gold px-6 py-3 rounded-lg font-semibold flex items-center space-x-2">
+          <i class="fas fa-headphones"></i>
+          <span>View Recordings</span>
+        </a>
+        <a href="support.html" class="btn-gold px-6 py-3 rounded-lg font-semibold flex items-center space-x-2">
+          <i class="fas fa-headset"></i>
+          <span>Get Tech Support</span>
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer py-12">
+    <div class="container mx-auto px-6">
+      <div class="grid md:grid-cols-4 gap-8">
+        <div>
+          <div class="flex items-center space-x-2 mb-4">
+            <i class="fas fa-microphone-alt text-2xl gold-text"></i>
+            <span class="text-xl font-bold text-white">RJS <span class="gold-text">Shuir</span></span>
+          </div>
+          <p class="text-gray-400">
+            Providing quality Torah audio content for meaningful learning experiences.
+          </p>
+        </div>
+        
+        <div>
+          <h4 class="text-lg font-semibold text-white mb-4">Quick Links</h4>
+          <ul class="space-y-2">
+            <li><a href="index.html" class="text-gray-400 hover:text-primary transition-colors">Home</a></li>
+            <li><a href="recordings.html" class="text-gray-400 hover:text-primary transition-colors">Recordings</a></li>
+            <li><a href="support.html" class="text-gray-400 hover:text-primary transition-colors">Support</a></li>
+          </ul>
+        </div>
+        
+        <div>
+          <h4 class="text-lg font-semibold text-white mb-4">Resources</h4>
+          <ul class="space-y-2">
+            <li><a href="#" class="text-gray-400 hover Montrer le texte source
+System: You are Grok 3 built by xAI.
+
+I notice that the previous response was cut off, and I need to provide a complete version of the `index.html` file, merging the functional homepage content with the visual enhancements from the nice support page. The functional version (`index.html`) contains a simple homepage with navigation and a call-to-action section, while the nice version (`support.html`) has advanced styling, Font Awesome icons, a sticky navigation bar, a footer, and JavaScript for interactivity. The goal is to apply the visual and structural enhancements from the nice version to the functional homepage while preserving all its functionality (navigation links and buttons).
+
+### Approach:
+- **Preserve Functionality**: Retain the navigation bar (links to Home, Recordings, Support), homepage content (title, description, buttons), and link functionality from the functional version.
+- **Incorporate Visual Elements**: Use the CSS variables, gradient effects, hover animations, Font Awesome icons, and responsive layout from the nice version.
+- **Enhance Structure**: Adopt the sticky navigation with backdrop blur, container-based layout, and footer from the nice version.
+- **Add Interactivity**: Include JavaScript for smooth scrolling to sections (if needed) and ensure buttons remain functional.
+- **Homepage Focus**: Exclude support-specific features (FAQ, contact form) but include the footer and general styling for consistency.
+
+### Key Changes:
+- Use the Tailwind CSS script tag from the nice version for the latest features.
+- Import the Inter font with additional weights (300, 500, 700) and Font Awesome for icons.
+- Apply `:root` CSS variables (e.g., `--primary`, `--bg-dark`) and styles (e.g., `.gold-gradient`, `.btn-gold`, `.nav-link`) from the nice version.
+- Enhance navigation with a microphone icon, hover effects, and a sticky backdrop-blur effect.
+- Style the main content with a centered layout, animated buttons, and a gradient underline for the title.
+- Add the footer from the nice version with quick links and social media placeholders.
+- Include minimal JavaScript for button interactions (e.g., scroll-to-section).
+
+Below is the complete `index.html` with the functional content and visual enhancements.
+
+<xaiArtifact artifact_id="de32c507-88c7-4e7e-b5e4-3518b91860c7" artifact_version_id="1c30ddcf-6eee-4431-894e-61462e35e747" title="index.html" contentType="text/html">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RJS Shuir - Home</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;,又700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --primary: #d4af37;
+      --primary-hover: #f0c14b;
+      --bg-dark: #0f0f0f;
+      --bg-darker: #0a0a0a;
+      --bg-card: #1a1a1a;
+      --text-primary: #f5f5f5;
+      --text-secondary: #d1d5db;
+    }
+    
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .gold-gradient {
+      background: linear-gradient(135deg, var(--primary) 0%, #f0c14b 100%);
+    }
+    
+    .gold-text {
+      color: var(--primary);
+    }
+    
+    .btn-gold {
+      background-color: var(--primary);
+      color: var(--bg-darker);
+      transition: all 0.3s ease;
+    }
+    
+    .btn-gold:hover {
+      background-color: var(--primary-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .nav-link {
+      position: relative;
+      transition: all 0.3s ease;
+    }
+    
+    .nav-link:hover {
+      color: var(--primary);
+    }
+    
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      width: 0;
+      height: 2px;
+      bottom: -2px;
+      left: 0;
+      background-color: var(--primary);
+      transition: width 0.3s ease;
+    }
+    
+    .nav-link:hover::after {
+      width: 100%;
+    }
+    
+    .footer {
+      background-color: var(--bg-darker);
+    }
+    
+    .section-title {
+      position: relative;
+      display: inline-block;
+    }
+    
+    .section-title::after {
+      content: '';
+      position: absolute;
+      width: 60%;
+      height: 3px;
+      bottom: -8px;
+      left: 20%;
+      background: linear-gradient(90deg, var(--primary) 0%, transparent 100%);
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="bg-black/90 backdrop-blur-md sticky top-0 z-50 border-b border-gray-800">
+    <div class="container mx-auto px-6 py-4">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+          <i class="fas fa-microphone-alt text-2xl gold-text"></i>
+          <a href="index.html" class="text-2xl font-bold text-white hover:text-primary transition-colors">
+            RJS <span class="gold-text">Shuir</span>
+          </a>
+        </div>
+        
+        <div class="hidden md:flex items-center space-x-8">
+          <a href="index.html" class="nav-link text-white font-medium gold-text">Home</a>
+          <a href="recordings.html" class="nav-link text-white font-medium">Recordings</a>
+          <a href="support.html" class="nav-link text-white font-medium">Support</a>
+          <a href="recordings.html" class="btn-gold px-6 py-2 rounded-full font-semibold flex items-center space-x-2">
+            <i class="fas fa-headphones"></i>
+            <span>Listen Now</span>
+          </a>
+        </div>
+        
+        <button class="md:hidden text-white focus:outline-none">
+          <i class="fas fa-bars text-2xl"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="flex-grow py-12">
+    <div class="container mx-auto px-6 text-center">
+      <h2 class="text-3xl md:text-4xl font-bold mb-2 section-title text-white">
+        Welcome to <span class="gold-text">RJS Shuir</span>
+      </h2>
+      <p class="text-lg text-gray-400 mb-10 max-w-2xl mx-auto">
+        Discover our collection of Shiur and Mussar recordings. Search, listen, or download with ease.
+      </p>
+      <div class="flex justify-center space-x-4">
+        <a href="recordings.html" class="btn-gold px-6 py-3 rounded-lg font-semibold flex items-center space-x-2">
+          <i class="fas fa-headphones"></i>
+          <span>View Recordings</span>
+        </a>
+        <a href="support.html" class="btn-gold px-6 py-3 rounded-lg font-semibold flex items-center space-x-2">
+          <i class="fas fa-headset"></i>
+          <span>Get Tech Support</span>
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer py-12">
+    <div class="container mx-auto px-6">
+      <div class="grid md:grid-cols-4 gap-8">
+        <div>
+          <div class="flex items-center space-x-2 mb-4">
+            <i class="fas fa-microphone-alt text-2xl gold-text"></i>
+            <span class="text-xl font-bold text-white">RJS <span class="gold-text">Shuir</span></span>
+          </div>
+          <p class="text-gray-400">
+            Providing quality Torah audio content for meaningful learning experiences.
+          </p>
+        </div>
+        
+        <div>
+          <h4 class="text-lg font-semibold text-white mb-4">Quick Links</h4>
+          <ul class="space-y-2">
+            <li><a href="index.html" class="text-gray-400 hover:text-primary transition-colors">Home</a></li>
+            <li><a href="recordings.html" class="text-gray-400 hover:text-primary transition-colors">Recordings</a></li>
+            <li><a href="support.html" class="text-gray-400 hover:text-primary transition-colors">Support</a></li>
+          </ul>
+        </div>
+        
+        <div>
+          <h4 class="text-lg font-semibold text-white mb-4">Resources</h4>
+          <ul class="space-y-2">
+            <li><a href="#" class="text-gray-400 hover:text-primary transition-colors">FAQ</a></li>
+            <li><a href="#" class="text-gray-400 hover:text-primary transition-colors">How to Download</a></li>
+            <li><a href="#" class="text-gray-400 hover:text-primary transition-colors">Mobile App</a></li>
+          </ul>
+        </div>
+        
+        <div>
+          <h4 class="text-lg: 'Connect'</h4>
+          <div class="flex space-x-4">
+            <a href="#" class="text-gray-400 hover:text-primary transition-colors text-xl"><i class="fab fa-facebook-f"></i></a>
+            <a href="#" class="text-gray-400 hover:text-primary transition-colors text-xl"><i class="fab fa-twitter"></i></a>
+            <a href="#" class="text-gray-400 hover:text-primary transition-colors text-xl"><i class="fab fa-instagram"></i></a>
+            <a href="#" class="text-gray-400 hover:text-primary transition-colors text-xl"><i class="fab fa-youtube"></i></a>
+          </div>
+        </div>
+      </div>
+      
+      <div class="border-t border-gray-800 mt-12 pt-8 text-center text-gray-500">
+        <p>© 2023 RJS Shuir. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
   <script>
-    document.getElementById('support-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const formData = new FormData(e.target);
-      const data = Object.fromEntries(formData);
-      const message = document.getElementById('support-message');
-      try {
-        const response = await fetch('/send-support', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-        const result = await response.json();
-        message.textContent = result.message;
-        message.classList.add('text-green-400');
-        e.target.reset();
-      } catch (error) {
-        message.textContent = 'Error sending request.';
-        message.classList.add('text-red-400');
-      }
-    });
+    // Scroll to section
+    function scrollToSection(id) {
+      document.getElementById(id).scrollIntoView({
+        behavior: 'smooth'
+      });
+    }
   </script>
 </body>
 </html>
