@@ -2,9 +2,7 @@ const express = require('express');
 const nodemailer = require('nodemailer');
 const dotenv = require('dotenv');
 const { MongoClient } = require('mongodb');
-const { put } = require('@vercel/blob');
 const cors = require('cors');
-const multer = require('multer');
 
 dotenv.config();
 const app = express();
@@ -16,15 +14,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type'],
 }));
 
-// Configure Multer for file uploads with increased file size limit
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 200 * 1024 * 1024 }, // 200MB limit
-});
-
-// Increase Express body parser limit
-app.use(express.json({ limit: '200mb' }));
-app.use(express.urlencoded({ extended: true, limit: '200mb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static('.'));
 
 // MongoDB setup
@@ -71,22 +62,32 @@ app.post('/send-support', async (req, res) => {
   }
 });
 
-// Handle file upload and metadata storage
-app.post('/upload-recording', upload.single('file'), async (req, res) => {
+// New endpoint to generate a signed upload token for Vercel Blob
+app.post('/generate-upload-token', async (req, res) => {
+  const { filename } = req.body;
+  if (!filename) {
+    return res.status(400).json({ message: 'Filename is required.' });
+  }
   try {
-    const { date, type, 'shiur-number': shiurNumber, 'mussar-name': mussarName } = req.body;
-    const file = req.file;
-
-    if (!file || !date || !type) {
-      return res.status(400).json({ message: 'Missing required fields.' });
-    }
-
-    // Upload file to Vercel Blob
-    const pathname = `recordings/${Date.now()}_${file.originalname}`;
-    const { url } = await put(pathname, file.buffer, {
-      access: 'public',
+    const pathname = `recordings/${Date.now()}_${filename}`;
+    // Return the pathname and token for client-side upload
+    res.json({
+      pathname,
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
+  } catch (error) {
+    console.error('Error generating upload token:', error);
+    res.status(500).json({ message: 'Error generating upload token.' });
+  }
+});
+
+// Endpoint to store recording metadata
+app.post('/store-recording', async (req, res) => {
+  try {
+    const { date, type, 'shiur-number': shiurNumber, 'mussar-name': mussarName, fileUrl } = req.body;
+    if (!fileUrl || !date || !type) {
+      return res.status(400).json({ message: 'Missing required fields.' });
+    }
 
     // Store metadata in MongoDB
     const collection = db.collection('recordings');
@@ -95,27 +96,16 @@ app.post('/upload-recording', upload.single('file'), async (req, res) => {
       type,
       ...(type === 'Shiur' && { shiurNumber }),
       ...(type === 'Mussar' && { mussarName }),
-      fileUrl: url,
+      fileUrl,
       uploadedAt: new Date(),
     };
     await collection.insertOne(recording);
 
-    res.json({ message: 'Recording uploaded and metadata stored successfully!' });
+    res.json({ message: 'Recording metadata stored successfully!' });
   } catch (error) {
-    console.error('Error uploading recording:', error);
-    res.status(500).json({ message: `Error uploading recording: ${error.message}` });
+    console.error('Error storing recording metadata:', error);
+    res.status(500).json({ message: `Error storing recording metadata: ${error.message}` });
   }
-});
-
-// Error handling middleware for Multer errors
-app.use((err, req, res, next) => {
-  if (err instanceof multer.MulterError) {
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(413).json({ message: 'File too large. Maximum size is 200MB.' });
-    }
-    return res.status(400).json({ message: `Multer error: ${err.message}` });
-  }
-  next(err);
 });
 
 app.get('/search', async (req, res) => {

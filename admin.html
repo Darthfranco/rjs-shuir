@@ -6,6 +6,7 @@
   <title>RJS Shuir - Admin</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/@vercel/blob@0.23.4/dist/client/index.js"></script>
   <style>
     body {
       background-color: #1a1a1a;
@@ -98,44 +99,63 @@
     document.getElementById('upload-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const message = document.getElementById('upload-message');
-      const formData = new FormData(e.target);
-      const file = formData.get('file');
+      const fileInput = document.getElementById('file');
+      const file = fileInput.files[0];
+      const date = document.getElementById('date').value;
       const type = document.getElementById('type').value;
+      const shiurNumber = document.getElementById('shiur-number').value;
+      const mussarName = document.getElementById('mussar-name').value;
 
       // Client-side file size validation
       const maxSize = 200 * 1024 * 1024; // 200MB in bytes
-      if (file.size > maxSize) {
-        message.textContent = 'File too large. Maximum size is 200MB.';
+      if (!file || file.size > maxSize) {
+        message.textContent = 'File too large or missing. Maximum size is 200MB.';
         message.classList.add('text-red-400');
         return;
       }
-
-      if (!file || !formData.get('date') || !type) {
+      if (!date || !type) {
         message.textContent = 'Missing required fields.';
         message.classList.add('text-red-400');
         return;
       }
 
       try {
-        // Upload file and metadata to server
-        const response = await fetch('/upload-recording', {
+        // Step 1: Get upload token from server
+        const tokenResponse = await fetch('/generate-upload-token', {
           method: 'POST',
-          body: formData,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: file.name }),
+        });
+        const tokenResult = await tokenResponse.json();
+        if (!tokenResponse.ok) {
+          throw new Error(tokenResult.message || 'Failed to get upload token.');
+        }
+        const { pathname, token } = tokenResult;
+
+        // Step 2: Upload file to Vercel Blob client-side
+        const { url } = await VercelBlob.upload(pathname, file, {
+          access: 'public',
+          token,
         });
 
-        // Check if response is JSON
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          const text = await response.text();
-          throw new Error(`Server returned non-JSON response: ${text}`);
+        // Step 3: Store metadata in MongoDB
+        const metadataResponse = await fetch('/store-recording', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date,
+            type,
+            'shiur-number': type === 'Shiur' ? shiurNumber : undefined,
+            'mussar-name': type === 'Mussar' ? mussarName : undefined,
+            fileUrl: url,
+          }),
+        });
+        const metadataResult = await metadataResponse.json();
+        if (!metadataResponse.ok) {
+          throw new Error(metadataResult.message || 'Failed to store metadata.');
         }
 
-        const result = await response.json();
-        if (!response.ok) {
-          throw new Error(result.message || 'Failed to upload recording.');
-        }
-
-        message.textContent = result.message;
+        message.textContent = metadataResult.message;
         message.classList.add('text-green-400');
         e.target.reset();
       } catch (error) {

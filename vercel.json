@@ -12,12 +12,12 @@
     ],
     "routes": [
       {
-        "src": "/upload-recording",
+        "src": "/(generate-upload-token|store-recording)",
         "dest": "/server.js",
         "methods": ["POST"]
       },
       {
-        "src": "/(send-support|search|store-recording)",
+        "src": "/(send-support|search)",
         "dest": "/server.js"
       },
       {
