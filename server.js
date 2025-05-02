@@ -3,9 +3,21 @@ const nodemailer = require('nodemailer');
 const dotenv = require('dotenv');
 const { MongoClient } = require('mongodb');
 const { put } = require('@vercel/blob');
+const cors = require('cors');
+const multer = require('multer');
 
 dotenv.config();
 const app = express();
+
+// Configure CORS
+app.use(cors({
+  origin: process.env.VERCEL_URL || 'http://localhost:3000',
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type'],
+}));
+
+// Configure Multer for file uploads
+const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -55,39 +67,22 @@ app.post('/send-support', async (req, res) => {
   }
 });
 
-// Updated endpoint to generate a signed upload URL
-app.post('/generate-upload-url', async (req, res) => {
-  const { filename } = req.body;
-  if (!filename) {
-    return res.status(400).json({ message: 'Filename is required.' });
-  }
+// New endpoint to handle file upload and metadata storage
+app.post('/upload-recording', upload.single('file'), async (req, res) => {
   try {
-    // Generate a unique pathname for the blob
-    const pathname = `recordings/${Date.now()}_${filename}`;
-    // Return the pathname and token for client-side upload
-    res.json({
-      uploadUrl: `https://blob.vercel-storage.com/${pathname}`,
-      pathname,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    });
-  } catch (error) {
-    console.error('Error generating upload URL:', error);
-    res.status(500).json({ message: 'Error generating upload URL.' });
-  }
-});
+    const { date, type, 'shiur-number': shiurNumber, 'mussar-name': mussarName } = req.body;
+    const file = req.file;
 
-// GET endpoint to handle invalid method for generate-upload-url
-app.get('/generate-upload-url', (req, res) => {
-  res.status(405).json({ message: 'Method Not Allowed. Use POST to generate upload URL.' });
-});
-
-// Modified upload endpoint to store metadata only
-app.post('/store-recording', async (req, res) => {
-  try {
-    const { date, type, 'shiur-number': shiurNumber, 'mussar-name': mussarName, fileUrl } = req.body;
-    if (!fileUrl || !date || !type) {
+    if (!file || !date || !type) {
       return res.status(400).json({ message: 'Missing required fields.' });
     }
+
+    // Upload file to Vercel Blob
+    const pathname = `recordings/${Date.now()}_${file.originalname}`;
+    const { url } = await put(pathname, file.buffer, {
+      access: 'public',
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
 
     // Store metadata in MongoDB
     const collection = db.collection('recordings');
@@ -96,15 +91,15 @@ app.post('/store-recording', async (req, res) => {
       type,
       ...(type === 'Shiur' && { shiurNumber }),
       ...(type === 'Mussar' && { mussarName }),
-      fileUrl,
+      fileUrl: url,
       uploadedAt: new Date(),
     };
     await collection.insertOne(recording);
 
-    res.json({ message: 'Recording metadata stored successfully!' });
+    res.json({ message: 'Recording uploaded and metadata stored successfully!' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error storing recording metadata.' });
+    console.error('Error uploading recording:', error);
+    res.status(500).json({ message: 'Error uploading recording: ' + error.message });
   }
 });
 
@@ -130,7 +125,7 @@ app.get('/search', async (req, res) => {
 });
 
 app.listen(3000, () => {
-  console.log('Server running on http://localhost facilitation');
+  console.log('Server running on http://localhost:3000');
 });
 
 module.exports = app;

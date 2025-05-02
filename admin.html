@@ -98,58 +98,26 @@
     document.getElementById('upload-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const message = document.getElementById('upload-message');
-      const fileInput = document.getElementById('file');
-      const file = fileInput.files[0];
-      const date = document.getElementById('date').value;
+      const formData = new FormData(e.target);
       const type = document.getElementById('type').value;
-      const shiurNumber = document.getElementById('shiur-number').value;
-      const mussarName = document.getElementById('mussar-name').value;
 
-      if (!file || !date || !type) {
+      if (!formData.get('file') || !formData.get('date') || !type) {
         message.textContent = 'Missing required fields.';
         message.classList.add('text-red-400');
         return;
       }
 
       try {
-        // Step 1: Get upload URL from server
-        const response = await fetch('/generate-upload-url', {
+        // Upload file and metadata to server
+        const response = await fetch('/upload-recording', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: file.name }),
+          body: formData,
         });
-        const { uploadUrl, pathname, token } = await response.json();
-        if (!uploadUrl || !pathname || !token) {
-          throw new Error('Failed to get upload URL.');
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.message || 'Failed to upload recording.');
         }
 
-        // Step 2: Upload file to Vercel Blob
-        const uploadResponse = await fetch(uploadUrl, {
-          method: 'PUT',
-          body: file,
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'x-vercel-blob-pathname': pathname,
-          },
-        });
-        if (!uploadResponse.ok) {
-          throw new Error('Failed to upload file to Vercel Blob.');
-        }
-        const fileUrl = uploadUrl;
-
-        // Step 3: Store metadata in MongoDB
-        const metadataResponse = await fetch('/store-recording', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            date,
-            type,
-            'shiur-number': type === 'Shiur' ? shiurNumber : undefined,
-            'mussar-name': type === 'Mussar' ? mussarName : undefined,
-            fileUrl,
-          }),
-        });
-        const result = await metadataResponse.json();
         message.textContent = result.message;
         message.classList.add('text-green-400');
         e.target.reset();

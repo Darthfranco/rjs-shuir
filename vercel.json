@@ -12,7 +12,7 @@
     ],
     "routes": [
       {
-        "src": "/generate-upload-url",
+        "src": "/upload-recording",
         "dest": "/server.js",
         "methods": ["POST"]
       },
