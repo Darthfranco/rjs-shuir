@@ -12,12 +12,16 @@
     ],
     "routes": [
       {
-        "src": "/(send-support|upload|search)",
-        "dest": "server.js"
+        "src": "/(send-support|search|generate-upload-url|store-recording)",
+        "dest": "/server.js"
+      },
+      {
+        "src": "/(.*\\.(html|css|js|png|jpg|jpeg|gif|ico|svg|mp3))",
+        "dest": "/$1"
       },
       {
         "src": "/(.*)",
-        "dest": "$1"
+        "dest": "/index.html"
       }
     ]
-  }
+}
